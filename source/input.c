@@ -1262,6 +1262,31 @@ int input_read_parameters(
     }
   }
 
+  class_call(parser_read_string(pfc,
+				"gcdm coupling",
+				&(string1),
+				&(flag1),
+				errmsg),
+	     errmsg,
+	     errmsg);
+  if(flag1 == _TRUE_){
+    if( (strstr(string1,"y")!=NULL) || (strstr(string1,"Y")!=NULL)){
+      pth->has_coupling_gcdm=_TRUE_;
+    }
+    else{
+      if((strstr(string1,"n")!=NULL) || (strstr(string1,"N")!=NULL)){
+	pth->has_coupling_gcdm=_FALSE_;
+      }
+      else {
+	class_stop(errmsg,"incomprehensible input '%s' for the field 'gcdm coupling'",string1);
+      }
+    }
+  }
+
+  if(pth->has_coupling_gcdm==_TRUE_){
+    class_read_double("u_gcdm",pth->u_gcdm);
+  }
+
   /** (c) define which perturbations and sources should be computed, and down to which scale */
 
   ppt->has_perturbations = _FALSE_;
@@ -2947,6 +2972,9 @@ int input_default_params(
   pth->compute_cb2_derivatives=_FALSE_;
 
   pth->compute_damping_scale = _FALSE_;
+
+  pth->u_gcdm=0.;
+  pth->has_coupling_gcdm=_FALSE_;
 
   /** - perturbation structure */
 
