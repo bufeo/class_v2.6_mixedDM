@@ -151,6 +151,9 @@ struct thermo
   double annihilation_f_halo; /** takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo; /** characteristic redshift for DM annihilation in halos*/
 
+  short has_coupling_gcdm; /** indicate wether a possible coupling between CDM and photons should be taken into account */
+  double u_gcdm; /** strength of the photon-DM coupling. Only relevant if has_coupling_gcdm set TRUE*/
+
   //@}
 
   /** @name - all indices for the vector of thermodynamical (=th) quantities stored in table */
@@ -173,6 +176,11 @@ struct thermo
   int index_th_rate;          /**< maximum variation rate of \f$ exp^{-\kappa}\f$, g and \f$ (d g / d \tau) \f$, used for computing integration step in perturbation module */
   int index_th_r_d;           /**< simple analytic approximation to the photon comoving damping scale */
   int th_size;                /**< size of thermodynamics vector */
+
+  int index_th_dmu_gcdm;      /**< new scattering rate \f$ dmu = a n_dm \sigma_{\gamma-dm} \f$ */
+  int index_th_ddmu_gcdm;     /**< its derivative w.r.t conformal time*/
+  int index_th_dddmu_gcdm;    /**< second derivative w.r.t. conformal time*/
+  int index_th_mu_gcdm;       /**< integral w.r.t. conformal time. For internal use only*/
 
   //@}
 
