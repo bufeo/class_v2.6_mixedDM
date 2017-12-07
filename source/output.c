@@ -1244,6 +1244,9 @@ int output_thermodynamics(
     if (pth->compute_damping_scale == _TRUE_) {
       fprintf(thermofile,"#  r_d = simplest analytic approximation to photon comoving damping scale \n");
     }
+    if(pth->has_coupling_gcdm == _TRUE_){
+      fprintf(thermofile, "# dmu_gcdm = rate for gamma-cdm scattering \n");
+    }
   }
 
   output_print_data(thermofile,

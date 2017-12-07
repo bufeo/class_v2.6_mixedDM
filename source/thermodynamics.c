@@ -141,6 +141,22 @@ int thermodynamics_at_z(
     /* Calculate d3kappa/dtau3 given that [dkappa/dtau] proportional to (1+z)^2 */
     pvecthermo[pth->index_th_dddkappa] = (pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/ (1.+z) - pvecback[pba->index_bg_H_prime]) * 2. / (1.+z) * pvecthermo[pth->index_th_dkappa];
 
+    if (pth->has_coupling_gcdm==_TRUE_)
+      {
+
+	/*Compute dmu/dtau (dmu/dtau = a rho_dm sigma_T u_gcdm/ 100GeV in units of 1/Mpc) */
+	pvecthermo[pth->index_th_dmu_gcdm] = (1.+z)*(1.+z)*pth->u_gcdm*3.*pba->H0*pba->H0/8./_PI_/_G_*pba->Omega0_cdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
+
+	/*Compute d2mu/d2tau (d2mu/d2tau = -2 a  H dmu) */
+	pvecthermo[pth->index_th_ddmu_gcdm]= -2.*pvecback[pba->index_bg_H]/(1.+z)*pvecthermo[pth->index_th_dmu_gcdm];
+
+	/*Compute d3mu/d3tau ( d3mu/d3tau = 2 a (a H^2 - dH/dtau) dmu ) */
+	pvecthermo[pth->index_th_dddmu_gcdm] = 2./(1.+z)*(pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/(1.+z) - pvecback[pba->index_bg_H_prime])*pvecthermo[pth->index_th_dmu_gcdm];
+
+	/* mu is only needed internally in the thermodynamics module -> set to 0 */
+	pvecthermo[pth->index_th_mu_gcdm] =0.;
+      }
+
     /* \f$ exp^{-\kappa}, g, g', g'' \f$ can be set to zero: they are
        used only for computing the source functions in the
        perturbation module; but source functions only need to be
@@ -295,6 +311,14 @@ int thermodynamics_init(
   if (pth->thermodynamics_verbose > 0)
     printf("Computing thermodynamics");
 
+  /** - check compatibbility of gcdm coupling */
+  if(pth->has_coupling_gcdm==_TRUE_)
+    {
+      class_test(pba->K!=0,
+		 pth->error_message,
+		 "cdm-photon coupling not implememnted with non-flat curvature");
+    }
+
   /** - compute and check primordial Helium fraction  */
 
   /* Y_He */
@@ -309,6 +333,9 @@ int thermodynamics_init(
     if (pth->thermodynamics_verbose > 0)
       printf("\n");
   }
+
+  if(pth->has_coupling_gcdm==_TRUE_ && pth->thermodynamics_verbose > 0)
+    printf(" -> g-cdm coupling strength set to %f\n", pth->u_gcdm);
 
   class_test((pth->YHe < _YHE_SMALL_)||(pth->YHe > _YHE_BIG_),
              pth->error_message,
@@ -613,41 +640,121 @@ int thermodynamics_init(
                pth->error_message);
   }
 
+  if(pth->has_coupling_gcdm==_TRUE_)
+    {
+      for (index_tau=0; index_tau<pth->tt_size; index_tau++)
+	{
+	  /** compute dmu/dtau (dmu/dtau = a rho_dm sigma_T u_gcdm/ 100GeV in units of 1/Mpc) */
+	  pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dmu_gcdm] = 
+	    3./8./_PI_/_G_*(pth->z_table[index_tau]+1.)*(pth->z_table[index_tau]+1.)*pba->Omega0_cdm*pba->H0*pba->H0*pth->u_gcdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
+	}
+    }
+
+  if(pth->has_coupling_gcdm==_TRUE_)
+    {
+      /** -> second derivative with respect to tau of dmu (in view of spline interpolation) */
+      class_call(array_spline_table_line_to_line(tau_table,
+						 pth->tt_size,
+						 pth->thermodynamics_table,
+						 pth->th_size,
+						 pth->index_th_dmu_gcdm,
+						 pth->index_th_dddmu_gcdm,
+						 _SPLINE_EST_DERIV_,
+						 pth->error_message),
+		 pth->error_message,
+		 pth->error_message);
+
+      /** -> first derivative with respect to tau of dmu (using spline interpolation) */
+      class_call(array_derive_spline_table_line_to_line(tau_table,
+							pth->tt_size,
+							pth->thermodynamics_table,
+							pth->th_size,
+							pth->index_th_dmu_gcdm,
+							pth->index_th_dddmu_gcdm,
+							pth->index_th_ddmu_gcdm,
+							pth->error_message),
+		 pth->error_message,
+		 pth->error_message);
+    }
+
+  if(pth->has_coupling_gcdm==_TRUE_)
+    {
+      /** - --> compute -mu = [int_{tau_today}^{tau} dtau dmu/dtau] */
+      class_call(array_integrate_spline_table_line_to_line(tau_table,
+							   pth->tt_size,
+							   pth->thermodynamics_table,
+							   pth->th_size,
+							   pth->index_th_dmu_gcdm,
+							   pth->index_th_dddmu_gcdm,
+							   pth->index_th_mu_gcdm,
+							   pth->error_message),
+		 pth->error_message,
+		 pth->error_message); 
+    }
+  
   free(tau_table);
 
   /** - --> compute visibility: \f$ g= (d \kappa/d \tau) e^{- \kappa} \f$ */
 
   /* loop on z (decreasing z, increasing time) */
   for (index_tau=pth->tt_size-1; index_tau>=0; index_tau--) {
-
-    /** - ---> compute g */
-    g = pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
-      exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
-
-    /** - ---> compute exp(-kappa) */
-    pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_exp_m_kappa] =
-      exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
-
-    /** - ---> compute g' (the plus sign of the second term is correct, see def of -kappa in thermodynamics module!) */
-    pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dg] =
-      (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddkappa] +
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]) *
-      exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
-
-    /** - ---> compute g''  */
-    pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddg] =
-      (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dddkappa] +
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddkappa] * 3. +
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
-       pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]) *
-      exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
-
+    if (pth->has_coupling_gcdm==_TRUE_)
+      {
+	/*- ---> compute g*/
+	g = (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]+pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dmu_gcdm])*
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]+pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_mu_gcdm]);
+	
+	/**- ---> compute exp(-kappa-mu) */
+	pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_exp_m_kappa] = 
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g] + pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_mu_gcdm]);
+	
+	/** - ---> compute g' (the plus sign of the second term is correct, see def of -kappa in thermodynamics module!) */
+	pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dg] = 
+	  (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddkappa] + pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_ddmu_gcdm]
+	   +pow(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dkappa]+
+		pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dmu_gcdm],2))
+	  *exp(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_g] + pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_mu_gcdm]);
+	
+	/** - ---> compute g''  */
+	pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_ddg] =
+	  (pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dddkappa]+ pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dddmu_gcdm]
+	   +3.*(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dkappa]+pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dmu_gcdm])
+	   *(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_ddkappa]+pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_ddmu_gcdm])
+	   +pow(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dkappa]+pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dmu_gcdm],3))
+	  *exp(pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_g] + pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_mu_gcdm]);
+	
+      }
+    else
+      {
+	
+	/** - ---> compute g */
+	g = pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
+	
+	/** - ---> compute exp(-kappa) */
+	pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_exp_m_kappa] =
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
+	
+	/** - ---> compute g' (the plus sign of the second term is correct, see def of -kappa in thermodynamics module!) */
+	pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dg] =
+	  (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddkappa] +
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]) *
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
+	
+	/** - ---> compute g''  */
+	pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddg] =
+	  (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dddkappa] +
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddkappa] * 3. +
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] *
+	   pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]) *
+	  exp(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g]);
+      }
     /** - ---> store g */
     pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_g] = g;
-
+    
     /** - ---> compute variation rate */
     class_test(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa] == 0.,
                pth->error_message,
@@ -923,6 +1030,17 @@ int thermodynamics_indices(
 
   if (pth->compute_damping_scale == _TRUE_) {
     pth->index_th_r_d = index;
+    index++;
+  }
+
+  if(pth->has_coupling_gcdm == _TRUE_){
+    pth->index_th_dmu_gcdm = index;
+    index++;
+    pth->index_th_ddmu_gcdm = index;
+    index++;
+    pth->index_th_dddmu_gcdm = index;
+    index++;
+    pth->index_th_mu_gcdm = index;
     index++;
   }
 
@@ -3700,6 +3818,7 @@ int thermodynamics_output_titles(struct background * pba,
   class_store_columntitle(titles,"tau_d",_TRUE_);
   //class_store_columntitle(titles,"max. rate",_TRUE_);
   class_store_columntitle(titles,"r_d",pth->compute_damping_scale);
+  class_store_columntitle(titles, "dmu_gcdm", pth->has_coupling_gcdm);
 
   return _SUCCESS_;
 }
@@ -3748,6 +3867,7 @@ int thermodynamics_output_data(struct background * pba,
     class_store_double(dataptr,pvecthermo[pth->index_th_tau_d],_TRUE_,storeidx);
     //class_store_double(dataptr,pvecthermo[pth->index_th_rate],_TRUE_,storeidx);
     class_store_double(dataptr,pvecthermo[pth->index_th_r_d],pth->compute_damping_scale,storeidx);
+    class_store_double(dataptr, pvecthermo[pth->index_th_dmu_gcdm], pth->has_coupling_gcdm, storeidx);
 
   }
 
