@@ -151,7 +151,6 @@ struct thermo
   double annihilation_f_halo; /** takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo; /** characteristic redshift for DM annihilation in halos*/
 
-  short has_coupling_gcdm; /** indicate wether a possible coupling between CDM and photons should be taken into account */
   double u_gcdm; /** strength of the photon-DM coupling. Only relevant if has_coupling_gcdm set TRUE*/
 
   //@}
@@ -489,6 +488,7 @@ extern "C" {
 			  );
 
   int thermodynamics_indices(
+			     struct background * pba,
 			     struct thermo * pthermo,
 			     struct recombination * preco,
 			     struct reionization * preio

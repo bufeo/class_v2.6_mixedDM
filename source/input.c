@@ -759,6 +759,25 @@ int input_read_parameters(
 
   Omega_tot += pba->Omega0_cdm;
 
+  /** - Omega_0_gcdm (gCDM) */
+  class_call(parser_read_double(pfc,"Omega_gcdm",&param1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  
+  if (flag1 == _TRUE_)
+    pba->Omega0_gcdm = param1;
+  
+  class_call(parser_read_double(pfc,"u_gcdm",&param1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+
+  if (flag1 == _TRUE_)
+    pth->u_gcdm = param1;
+
+  Omega_tot += pba->Omega0_gcdm;
+
+
+
   /** - Omega_0_dcdmdr (DCDM) */
   class_call(parser_read_double(pfc,"Omega_dcdmdr",&param1,&flag1,errmsg),
              errmsg,
@@ -1262,30 +1281,6 @@ int input_read_parameters(
     }
   }
 
-  class_call(parser_read_string(pfc,
-				"gcdm coupling",
-				&(string1),
-				&(flag1),
-				errmsg),
-	     errmsg,
-	     errmsg);
-  if(flag1 == _TRUE_){
-    if( (strstr(string1,"y")!=NULL) || (strstr(string1,"Y")!=NULL)){
-      pth->has_coupling_gcdm=_TRUE_;
-    }
-    else{
-      if((strstr(string1,"n")!=NULL) || (strstr(string1,"N")!=NULL)){
-	pth->has_coupling_gcdm=_FALSE_;
-      }
-      else {
-	class_stop(errmsg,"incomprehensible input '%s' for the field 'gcdm coupling'",string1);
-      }
-    }
-  }
-
-  if(pth->has_coupling_gcdm==_TRUE_){
-    class_read_double("u_gcdm",pth->u_gcdm);
-  }
 
   /** (c) define which perturbations and sources should be computed, and down to which scale */
 
@@ -2606,6 +2601,7 @@ int input_read_parameters(
   class_read_double("start_large_k_at_tau_h_over_tau_k",ppr->start_large_k_at_tau_h_over_tau_k);
   class_read_double("tight_coupling_trigger_tau_c_over_tau_h",ppr->tight_coupling_trigger_tau_c_over_tau_h);
   class_read_double("tight_coupling_trigger_tau_c_over_tau_k",ppr->tight_coupling_trigger_tau_c_over_tau_k);
+  class_read_double("tight_coupling_trigger_tau_c_over_tau_gcdm",ppr->tight_coupling_trigger_tau_c_over_tau_gcdm);
   class_read_double("start_sources_at_tau_c_over_tau_h",ppr->start_sources_at_tau_c_over_tau_h);
 
   class_read_int("tight_coupling_approximation",ppr->tight_coupling_approximation);
@@ -2903,6 +2899,7 @@ int input_default_params(
   pba->Omega0_ur = 3.046*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
   pba->Omega0_b = 0.022032/pow(pba->h,2);
   pba->Omega0_cdm = 0.12038/pow(pba->h,2);
+  pba->Omega0_gcdm = 0.0;
   pba->Omega0_dcdmdr = 0.0;
   pba->Omega0_dcdm = 0.0;
   pba->Gamma_dcdm = 0.0;
@@ -2974,7 +2971,6 @@ int input_default_params(
   pth->compute_damping_scale = _FALSE_;
 
   pth->u_gcdm=0.;
-  pth->has_coupling_gcdm=_FALSE_;
 
   /** - perturbation structure */
 
@@ -3293,6 +3289,7 @@ int input_default_precision ( struct precision * ppr ) {
   ppr->start_large_k_at_tau_h_over_tau_k = 0.07;  /* decrease to start earlier in time */
   ppr->tight_coupling_trigger_tau_c_over_tau_h=0.015; /* decrease to switch off earlier in time */
   ppr->tight_coupling_trigger_tau_c_over_tau_k=0.01; /* decrease to switch off earlier in time */
+  ppr->tight_coupling_trigger_tau_c_over_tau_gcdm=0.01;
   ppr->start_sources_at_tau_c_over_tau_h = 0.008; /* decrease to start earlier in time */
   ppr->tight_coupling_approximation=(int)compromise_CLASS;
 

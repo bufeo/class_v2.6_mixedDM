@@ -537,6 +537,8 @@ struct precision
    */
   double tight_coupling_trigger_tau_c_over_tau_k;
 
+  double tight_coupling_trigger_tau_c_over_tau_gcdm;
+
   double start_sources_at_tau_c_over_tau_h; /**< sources start being sampled when universe is sufficiently opaque. This is quantified in terms of the ratio of thermo to hubble time scales, \f$ \tau_c/\tau_H \f$. Start when start_sources_at_tau_c_over_tau_h equals this ratio. Decrease this value to start sampling the sources earlier in time. */
 
   int tight_coupling_approximation; /**< method for tight coupling approximation */

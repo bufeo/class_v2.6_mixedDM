@@ -141,11 +141,11 @@ int thermodynamics_at_z(
     /* Calculate d3kappa/dtau3 given that [dkappa/dtau] proportional to (1+z)^2 */
     pvecthermo[pth->index_th_dddkappa] = (pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/ (1.+z) - pvecback[pba->index_bg_H_prime]) * 2. / (1.+z) * pvecthermo[pth->index_th_dkappa];
 
-    if (pth->has_coupling_gcdm==_TRUE_)
+    if (pba->has_gcdm==_TRUE_)
       {
 
-	/*Compute dmu/dtau (dmu/dtau = a rho_dm sigma_T u_gcdm/ 100GeV in units of 1/Mpc) */
-	pvecthermo[pth->index_th_dmu_gcdm] = (1.+z)*(1.+z)*pth->u_gcdm*3.*pba->H0*pba->H0/8./_PI_/_G_*pba->Omega0_cdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
+	/*Compute dmu/dtau (dmu/dtau = a rho_gcdm sigma_T u_gcdm/ 100GeV in units of 1/Mpc) */
+	pvecthermo[pth->index_th_dmu_gcdm] = (1.+z)*(1.+z)*pth->u_gcdm*3.*pba->H0*pba->H0/8./_PI_/_G_*pba->Omega0_gcdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
 
 	/*Compute d2mu/d2tau (d2mu/d2tau = -2 a  H dmu) */
 	pvecthermo[pth->index_th_ddmu_gcdm]= -2.*pvecback[pba->index_bg_H]/(1.+z)*pvecthermo[pth->index_th_dmu_gcdm];
@@ -312,7 +312,7 @@ int thermodynamics_init(
     printf("Computing thermodynamics");
 
   /** - check compatibbility of gcdm coupling */
-  if(pth->has_coupling_gcdm==_TRUE_)
+  if(pba->has_gcdm==_TRUE_)
     {
       class_test(pba->K!=0,
 		 pth->error_message,
@@ -334,7 +334,7 @@ int thermodynamics_init(
       printf("\n");
   }
 
-  if(pth->has_coupling_gcdm==_TRUE_ && pth->thermodynamics_verbose > 0)
+  if(pba->has_gcdm==_TRUE_ && pth->thermodynamics_verbose > 0)
     printf(" -> g-cdm coupling strength set to %f\n", pth->u_gcdm);
 
   class_test((pth->YHe < _YHE_SMALL_)||(pth->YHe > _YHE_BIG_),
@@ -406,7 +406,7 @@ int thermodynamics_init(
 
   /** - assign values to all indices in the structures with thermodynamics_indices()*/
 
-  class_call(thermodynamics_indices(pth,preco,preio),
+  class_call(thermodynamics_indices(pba,pth,preco,preio),
              pth->error_message,
              pth->error_message);
 
@@ -640,17 +640,17 @@ int thermodynamics_init(
                pth->error_message);
   }
 
-  if(pth->has_coupling_gcdm==_TRUE_)
+  if(pba->has_gcdm==_TRUE_)
     {
       for (index_tau=0; index_tau<pth->tt_size; index_tau++)
 	{
 	  /** compute dmu/dtau (dmu/dtau = a rho_dm sigma_T u_gcdm/ 100GeV in units of 1/Mpc) */
 	  pth->thermodynamics_table [index_tau*pth->th_size+pth->index_th_dmu_gcdm] = 
-	    3./8./_PI_/_G_*(pth->z_table[index_tau]+1.)*(pth->z_table[index_tau]+1.)*pba->Omega0_cdm*pba->H0*pba->H0*pth->u_gcdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
+	    3./8./_PI_/_G_*(pth->z_table[index_tau]+1.)*(pth->z_table[index_tau]+1.)*pba->Omega0_gcdm*pba->H0*pba->H0*pth->u_gcdm*pow(_c_,4)*_sigma_/1.e11/_eV_/_Mpc_over_m_;
 	}
     }
 
-  if(pth->has_coupling_gcdm==_TRUE_)
+  if(pba->has_gcdm==_TRUE_)
     {
       /** -> second derivative with respect to tau of dmu (in view of spline interpolation) */
       class_call(array_spline_table_line_to_line(tau_table,
@@ -677,7 +677,7 @@ int thermodynamics_init(
 		 pth->error_message);
     }
 
-  if(pth->has_coupling_gcdm==_TRUE_)
+  if(pba->has_gcdm==_TRUE_)
     {
       /** - --> compute -mu = [int_{tau_today}^{tau} dtau dmu/dtau] */
       class_call(array_integrate_spline_table_line_to_line(tau_table,
@@ -698,7 +698,7 @@ int thermodynamics_init(
 
   /* loop on z (decreasing z, increasing time) */
   for (index_tau=pth->tt_size-1; index_tau>=0; index_tau--) {
-    if (pth->has_coupling_gcdm==_TRUE_)
+    if (pba->has_gcdm==_TRUE_)
       {
 	/*- ---> compute g*/
 	g = (pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]+pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dmu_gcdm])*
@@ -979,6 +979,7 @@ int thermodynamics_free(
  */
 
 int thermodynamics_indices(
+			   struct background * pba,
                            struct thermo * pth,
                            struct recombination * preco,
                            struct reionization * preio
@@ -1033,7 +1034,7 @@ int thermodynamics_indices(
     index++;
   }
 
-  if(pth->has_coupling_gcdm == _TRUE_){
+  if(pba->has_gcdm == _TRUE_){
     pth->index_th_dmu_gcdm = index;
     index++;
     pth->index_th_ddmu_gcdm = index;
@@ -3818,7 +3819,7 @@ int thermodynamics_output_titles(struct background * pba,
   class_store_columntitle(titles,"tau_d",_TRUE_);
   //class_store_columntitle(titles,"max. rate",_TRUE_);
   class_store_columntitle(titles,"r_d",pth->compute_damping_scale);
-  class_store_columntitle(titles, "dmu_gcdm", pth->has_coupling_gcdm);
+  class_store_columntitle(titles, "dmu_gcdm", pba->has_gcdm);
 
   return _SUCCESS_;
 }
@@ -3867,7 +3868,7 @@ int thermodynamics_output_data(struct background * pba,
     class_store_double(dataptr,pvecthermo[pth->index_th_tau_d],_TRUE_,storeidx);
     //class_store_double(dataptr,pvecthermo[pth->index_th_rate],_TRUE_,storeidx);
     class_store_double(dataptr,pvecthermo[pth->index_th_r_d],pth->compute_damping_scale,storeidx);
-    class_store_double(dataptr, pvecthermo[pth->index_th_dmu_gcdm], pth->has_coupling_gcdm, storeidx);
+    class_store_double(dataptr, pvecthermo[pth->index_th_dmu_gcdm], pba->has_gcdm, storeidx);
 
   }
 

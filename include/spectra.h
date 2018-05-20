@@ -218,6 +218,7 @@ struct spectra {
   int index_tr_delta_g;        /**< index of gamma density transfer function */
   int index_tr_delta_b;        /**< index of baryon density transfer function */
   int index_tr_delta_cdm;      /**< index of cold dark matter density transfer function */
+  int index_tr_delta_gcdm;
   int index_tr_delta_dcdm;     /**< index of decaying cold dark matter density transfer function */
   int index_tr_delta_scf;      /**< index of scalar field phi transfer function */
   int index_tr_delta_fld;      /**< index of dark energy fluid density transfer function */
@@ -228,6 +229,7 @@ struct spectra {
   int index_tr_theta_g;        /**< index of gamma velocity transfer function */
   int index_tr_theta_b;        /**< index of baryon velocity transfer function */
   int index_tr_theta_cdm;      /**< index of cold dark matter velocity transfer function */
+  int index_tr_theta_gcdm;
   int index_tr_theta_dcdm;     /**< index of decaying cold dark matter velocity transfer function */
   int index_tr_theta_scf;      /**< index of derivative of scalar field phi transfer function */
   int index_tr_theta_fld;      /**< index of dark energy fluid velocity transfer function */
