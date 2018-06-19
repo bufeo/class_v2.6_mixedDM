@@ -760,13 +760,27 @@ int input_read_parameters(
   Omega_tot += pba->Omega0_cdm;
 
   /** - Omega_0_gcdm (gCDM) */
-  class_call(parser_read_double(pfc,"Omega_gcdm",&param1,&flag1,errmsg),
+  class_call(parser_read_double(pfc,"Omega_gcdm", &param1, &flag1, errmsg),
              errmsg,
              errmsg);
+  class_call(parser_read_double(pfc, "omega_gcdm", &param2, &flag2, errmsg),
+	     errmsg,
+	     errmsg);
+  
+  class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+             errmsg,
+             "In input file, you can only enter one of Omega_gcdm or omega_gcdm, choose one");
+
   
   if (flag1 == _TRUE_)
     pba->Omega0_gcdm = param1;
+  if (flag2 == _TRUE_)
+    pba->Omega0_gcdm = param2/pba->h/pba->h;
+
+  Omega_tot += pba->Omega0_gcdm;
+
   
+  /** - u_gcdm **/
   class_call(parser_read_double(pfc,"u_gcdm",&param1,&flag1,errmsg),
              errmsg,
              errmsg);
@@ -774,7 +788,6 @@ int input_read_parameters(
   if (flag1 == _TRUE_)
     pth->u_gcdm = param1;
 
-  Omega_tot += pba->Omega0_gcdm;
 
 
 
